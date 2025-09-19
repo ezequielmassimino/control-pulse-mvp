@@ -13,6 +13,7 @@ from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
 import time
 import base64
+from io import BytesIO
 
 # Page Configuration
 st.set_page_config(
@@ -41,8 +42,47 @@ if 'risk_threshold' not in st.session_state:
     st.session_state.risk_threshold = 70
 if 'auto_refresh' not in st.session_state:
     st.session_state.auto_refresh = False
+if 'data_source' not in st.session_state:
+    st.session_state.data_source = 'demo'  # 'demo' or 'database'
 
-def create_logo_svg():
+def export_to_excel(dataframe, filename="export"):
+    """Export dataframe to Excel file and create download link"""
+    output = BytesIO()
+    
+    # Create Excel writer with xlsxwriter engine
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        dataframe.to_excel(writer, index=False, sheet_name='Data')
+        
+        # Get the xlsxwriter workbook and worksheet
+        workbook = writer.book
+        worksheet = writer.sheets['Data']
+        
+        # Add formatting
+        header_format = workbook.add_format({
+            'bold': True,
+            'bg_color': '#667eea',
+            'font_color': 'white',
+            'border': 1
+        })
+        
+        # Write headers with formatting
+        for col_num, value in enumerate(dataframe.columns.values):
+            worksheet.write(0, col_num, value, header_format)
+        
+        # Auto-adjust column widths
+        for i, col in enumerate(dataframe.columns):
+            column_width = max(dataframe[col].astype(str).str.len().max(), len(col)) + 2
+            worksheet.set_column(i, i, min(column_width, 50))
+    
+    output.seek(0)
+    return output
+
+def get_download_link(df, filename="exceptions_export"):
+    """Generate a download link for dataframe as Excel"""
+    excel_file = export_to_excel(df, filename)
+    b64 = base64.b64encode(excel_file.read()).decode()
+    href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="{filename}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx">📥 Download Excel Report</a>'
+    return href
     """Create a professional SVG logo for Control Pulse"""
     logo_svg = """
     <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
@@ -257,10 +297,33 @@ def get_css_styles():
 # Apply CSS styles
 st.markdown(get_css_styles(), unsafe_allow_html=True)
 
-# Load and prepare data with more exception types
+# Load and prepare data with database option
 @st.cache_data
 def load_data():
-    """Load the transaction data - in production this would connect to database/ERP"""
+    """Load the transaction data - can connect to database or use demo data"""
+    
+    # Check data source preference
+    if st.session_state.data_source == 'database':
+        # Database connection template - uncomment and configure for production
+        try:
+            # Example database connection (uncomment and configure):
+            # import sqlite3
+            # conn = sqlite3.connect('your_database.db')
+            # df = pd.read_sql_query("SELECT * FROM transactions WHERE risk_score > 70", conn)
+            # conn.close()
+            # return df
+            
+            # For MVP, fallback to demo data
+            st.info("Database connection configured but using demo data for MVP")
+            return load_demo_data()
+        except Exception as e:
+            st.warning(f"Database connection failed, using demo data: {str(e)}")
+            return load_demo_data()
+    else:
+        return load_demo_data()
+
+def load_demo_data():
+    """Generate demo transaction data"""
     np.random.seed(42)
     
     # Generate normal transactions
@@ -491,12 +554,22 @@ def show_dashboard():
         with col4:
             st.metric("📊 Effectiveness", f"{metrics['effectiveness']}%", "+2%")
     
-    # Exception type filter
+    # Exception type filter with export button
     st.markdown("---")
-    st.markdown("### 🎯 Exceptions Requiring Review")
+    col1, col2 = st.columns([3, 1]) if not is_mobile() else [st.container(), st.container()]
     
-    exception_types = ['All'] + list(exceptions['anomaly_type'].unique())
-    selected_type = st.selectbox("Filter by Exception Type:", exception_types, index=0)
+    with col1:
+        st.markdown("### 🎯 Exceptions Requiring Review")
+        exception_types = ['All'] + list(exceptions['anomaly_type'].unique())
+        selected_type = st.selectbox("Filter by Exception Type:", exception_types, index=0)
+    
+    with col2:
+        st.markdown("### 📊 Export")
+        if st.button("📥 Export to Excel", use_container_width=True):
+            # Prepare export data
+            export_df = exceptions[['transaction_id', 'vendor_name', 'amount', 'risk_score', 
+                                   'anomaly_type', 'ai_explanation', 'approval_date', 'status']]
+            st.markdown(get_download_link(export_df, "control_pulse_exceptions"), unsafe_allow_html=True)
     
     if selected_type != 'All':
         filtered_exceptions = exceptions[exceptions['anomaly_type'] == selected_type]
@@ -682,14 +755,51 @@ def show_settings():
                 ["30 seconds", "1 minute", "5 minutes", "15 minutes"]
             )
         
-        st.markdown("### 📊 Report Preferences")
+    st.markdown("---")
+    st.markdown("### 📊 Report Preferences")
+    
+    col1, col2 = st.columns(2) if not is_mobile() else [st.container(), st.container()]
+    
+    with col1:
         report_format = st.selectbox(
             "Default Export Format",
-            ["PDF", "Excel", "CSV", "JSON"]
+            ["Excel (.xlsx)", "CSV (.csv)", "PDF (coming soon)"]
         )
         
         include_evidence = st.checkbox("Include Evidence in Reports", value=True)
         include_ai_reasoning = st.checkbox("Include AI Reasoning", value=True)
+    
+    with col2:
+        st.markdown("### 🔗 Data Source")
+        data_source = st.radio(
+            "Select Data Source:",
+            ["Demo Data (MVP)", "Database Connection"],
+            index=0 if st.session_state.data_source == 'demo' else 1
+        )
+        
+        if data_source == "Database Connection":
+            st.session_state.data_source = 'database'
+            st.info("📌 Database Template Ready")
+            with st.expander("Database Configuration"):
+                st.code("""
+# Example configuration (uncomment in production):
+# DATABASE_CONFIG = {
+#     'host': 'your-host',
+#     'database': 'your-database',
+#     'user': 'your-username',
+#     'password': 'your-password',
+#     'port': 5432
+# }
+                """)
+                st.text_input("Host", placeholder="localhost")
+                st.text_input("Database", placeholder="control_pulse_db")
+                st.text_input("Username", placeholder="admin")
+                st.text_input("Password", type="password", placeholder="••••••••")
+                
+                if st.button("Test Connection"):
+                    st.warning("Using demo data for MVP. Database connection ready for production.")
+        else:
+            st.session_state.data_source = 'demo'
     
     st.markdown("---")
     st.markdown("### 👤 User Profile")
