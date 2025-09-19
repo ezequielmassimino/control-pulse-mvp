@@ -302,11 +302,15 @@ def show_dashboard():
     st.markdown("##### Financial Control Monitoring System")
     
     # User greeting - simplified for mobile
-    col1, col2 = st.columns([2, 1]) if not is_mobile() else st.columns([1])
+    if not is_mobile():
+        col1, col2 = st.columns([2, 1])
+    else:
+        col1 = st.container()
+        col2 = None
     with col1:
         st.markdown("### Good morning, Rachel!")
         st.markdown("You have **10 exceptions** requiring review")
-    if not is_mobile():
+    if not is_mobile() and col2 is not None:
         with col2:
             if st.button("👤 Settings"):
                 st.info("Settings page (coming soon)")
@@ -322,38 +326,63 @@ def show_dashboard():
     # For mobile, show metrics in 2x2 grid instead of 1x4
     if is_mobile():
         col1, col2 = st.columns(2)
+        with col1:
+            st.metric(
+                label="🔴 Exceptions",
+                value=metrics['exceptions'],
+                delta="High Priority",
+                delta_color="inverse"
+            )
+        with col2:
+            st.metric(
+                label="✅ Reviewed",
+                value=metrics['reviewed'],
+                delta="+12"
+            )
+        
         col3, col4 = st.columns(2)
+        with col3:
+            st.metric(
+                label="💰 Saved",
+                value=f"${metrics['savings']/1000:.0f}K",
+                delta="+23%"
+            )
+        with col4:
+            st.metric(
+                label="📊 Effectiveness",
+                value=f"{metrics['effectiveness']}%",
+                delta="+2%"
+            )
     else:
         col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric(
-            label="🔴 Exceptions",
-            value=metrics['exceptions'],
-            delta="High Priority",
-            delta_color="inverse"
-        )
-    
-    with col2:
-        st.metric(
-            label="✅ Reviewed",
-            value=metrics['reviewed'],
-            delta="+12"
-        )
-    
-    with col3:
-        st.metric(
-            label="💰 Saved",
-            value=f"${metrics['savings']/1000:.0f}K",
-            delta="+23%"
-        )
-    
-    with col4:
-        st.metric(
-            label="📊 Effectiveness",
-            value=f"{metrics['effectiveness']}%",
-            delta="+2%"
-        )
+        with col1:
+            st.metric(
+                label="🔴 Exceptions",
+                value=metrics['exceptions'],
+                delta="High Priority",
+                delta_color="inverse"
+            )
+        
+        with col2:
+            st.metric(
+                label="✅ Reviewed",
+                value=metrics['reviewed'],
+                delta="+12"
+            )
+        
+        with col3:
+            st.metric(
+                label="💰 Saved",
+                value=f"${metrics['savings']/1000:.0f}K",
+                delta="+23%"
+            )
+        
+        with col4:
+            st.metric(
+                label="📊 Effectiveness",
+                value=f"{metrics['effectiveness']}%",
+                delta="+2%"
+            )
     
     # Exception type filter
     st.markdown("---")
