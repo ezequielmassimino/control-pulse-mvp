@@ -703,4 +703,42 @@ def show_settings():
     
     with col2:
         st.text_input("Employee ID", value="EMP-2847")
-        st.selectbox("Approval Authority", ["$10,000", "$50,000",
+        st.selectbox("Approval Authority", ["$10,000", "$50,000", "$100,000", "$500,000", "Unlimited"])
+        st.selectbox("Time Zone", ["EST", "CST", "MST", "PST", "UTC"])
+    
+    st.markdown("---")
+    st.markdown("### 🔐 Security Settings")
+    
+    col1, col2 = st.columns(2) if not is_mobile() else [st.container(), st.container()]
+    
+    with col1:
+        st.checkbox("Two-Factor Authentication", value=True)
+        st.checkbox("Require Re-authentication for High-Risk Actions", value=True)
+        session_timeout = st.selectbox("Session Timeout", ["15 minutes", "30 minutes", "1 hour", "4 hours"])
+    
+    with col2:
+        st.checkbox("Audit All Actions", value=True)
+        st.checkbox("Screen Recording for Evidence", value=False)
+        st.selectbox("Data Retention Period", ["30 days", "90 days", "1 year", "7 years"])
+    
+    st.markdown("---")
+    
+    col1, col2, col3 = st.columns(3) if not is_mobile() else [st.container(), st.container(), st.container()]
+    
+    with col1:
+        if st.button("💾 Save Settings", type="primary", use_container_width=True):
+            st.success("✅ Settings saved successfully!")
+    
+    with col2:
+        if st.button("🔄 Reset to Defaults", use_container_width=True):
+            st.session_state.dark_mode = False
+            st.session_state.notifications_enabled = True
+            st.session_state.email_alerts = True
+            st.session_state.risk_threshold = 70
+            st.session_state.auto_refresh = False
+            st.info("Settings reset to defaults")
+            st.rerun()
+    
+    with col3:
+        if st.button("📤 Export Settings", use_container_width=True):
+            st.info("Settings exported to settings_config.json")
