@@ -12,111 +12,15 @@ import plotly.graph_objects as go
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
 import time
+import base64
 
 # Page Configuration
 st.set_page_config(
     page_title="Control Pulse - Financial Control Monitoring",
-    page_icon="🎯",
+    page_icon="⚡",  # Lightning bolt for real-time
     layout="wide",
     initial_sidebar_state="collapsed"
 )
-
-# Mobile-friendly CSS with responsive design
-st.markdown("""
-<style>
-/* Mobile-responsive adjustments */
-@media (max-width: 768px) {
-    .block-container {
-        padding: 1rem 0.5rem !important;
-    }
-    
-    .stButton>button {
-        font-size: 0.9rem !important;
-        height: 2.5em !important;
-        padding: 0.25rem 0.5rem !important;
-    }
-    
-    .exception-card {
-        font-size: 0.85rem !important;
-        padding: 10px !important;
-    }
-    
-    h1 {
-        font-size: 1.5rem !important;
-    }
-    
-    h2 {
-        font-size: 1.2rem !important;
-    }
-    
-    h3 {
-        font-size: 1rem !important;
-    }
-    
-    .stMetric {
-        padding: 0.5rem !important;
-    }
-    
-    /* Stack columns on mobile */
-    [data-testid="column"] {
-        width: 100% !important;
-        flex: 100% !important;
-    }
-}
-
-/* Desktop and general styles */
-.main > div {padding-top: 2rem;}
-.stButton>button {
-    width: 100%;
-    background-color: #667eea;
-    color: white;
-    height: 3em;
-    border-radius: 10px;
-    border: none;
-    font-weight: bold;
-    transition: all 0.3s;
-}
-.stButton>button:hover {
-    background-color: #764ba2;
-    transform: translateY(-2px);
-    box-shadow: 0 5px 10px rgba(0,0,0,0.2);
-}
-.metric-card {
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    text-align: center;
-}
-.exception-card {
-    background: white;
-    padding: 15px;
-    border-radius: 10px;
-    margin: 10px 0;
-    border-left: 4px solid;
-    word-wrap: break-word;
-}
-.high-risk {border-left-color: #ff4444;}
-.medium-risk {border-left-color: #ffaa00;}
-.low-risk {border-left-color: #00c851;}
-
-/* Improve mobile menu */
-.st-emotion-cache-16idsys p {
-    font-size: 0.9rem;
-}
-
-/* Better mobile data display */
-.dataframe {
-    font-size: 0.8rem !important;
-}
-
-/* Responsive charts */
-.js-plotly-plot {
-    max-width: 100%;
-    overflow-x: auto;
-}
-</style>
-""", unsafe_allow_html=True)
 
 # Initialize session state
 if 'current_page' not in st.session_state:
@@ -127,12 +31,236 @@ if 'actions_taken' not in st.session_state:
     st.session_state.actions_taken = []
 if 'current_exception' not in st.session_state:
     st.session_state.current_exception = 0
+if 'dark_mode' not in st.session_state:
+    st.session_state.dark_mode = False
+if 'notifications_enabled' not in st.session_state:
+    st.session_state.notifications_enabled = True
+if 'email_alerts' not in st.session_state:
+    st.session_state.email_alerts = True
+if 'risk_threshold' not in st.session_state:
+    st.session_state.risk_threshold = 70
+if 'auto_refresh' not in st.session_state:
+    st.session_state.auto_refresh = False
+
+def create_logo_svg():
+    """Create a professional SVG logo for Control Pulse"""
+    logo_svg = """
+    <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+        <!-- Outer circle with gradient -->
+        <defs>
+            <linearGradient id="pulseGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+                <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+            </linearGradient>
+            <filter id="shadow">
+                <feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.2"/>
+            </filter>
+        </defs>
+        
+        <!-- Background circle -->
+        <circle cx="20" cy="20" r="18" fill="url(#pulseGradient)" filter="url(#shadow)"/>
+        
+        <!-- Pulse line -->
+        <path d="M 8 20 L 12 20 L 14 15 L 17 25 L 20 10 L 23 30 L 26 15 L 28 20 L 32 20" 
+              stroke="white" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        
+        <!-- Center dot -->
+        <circle cx="20" cy="20" r="2" fill="white"/>
+    </svg>
+    """
+    return logo_svg
+
+def get_css_styles():
+    """Get CSS styles with dark mode support"""
+    dark_mode = st.session_state.dark_mode
+    
+    if dark_mode:
+        return """
+        <style>
+        /* Dark mode styles */
+        .stApp {
+            background-color: #1a1a2e;
+            color: #eee;
+        }
+        
+        /* Mobile-responsive adjustments */
+        @media (max-width: 768px) {
+            .block-container {
+                padding: 1rem 0.5rem !important;
+            }
+            
+            .stButton>button {
+                font-size: 0.9rem !important;
+                height: 2.5em !important;
+                padding: 0.25rem 0.5rem !important;
+            }
+            
+            .exception-card {
+                font-size: 0.85rem !important;
+                padding: 10px !important;
+            }
+            
+            h1 { font-size: 1.5rem !important; }
+            h2 { font-size: 1.2rem !important; }
+            h3 { font-size: 1rem !important; }
+            
+            .stMetric { padding: 0.5rem !important; }
+            
+            [data-testid="column"] {
+                width: 100% !important;
+                flex: 100% !important;
+            }
+        }
+        
+        /* Dark mode specific */
+        .main > div {padding-top: 2rem;}
+        .stButton>button {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            height: 3em;
+            border-radius: 10px;
+            border: none;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
+        }
+        .stButton>button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.5);
+        }
+        .exception-card {
+            background: #2a2a3e;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            border-left: 4px solid;
+            word-wrap: break-word;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        .high-risk {border-left-color: #ff4757;}
+        .medium-risk {border-left-color: #ffa502;}
+        .low-risk {border-left-color: #32ff7e;}
+        
+        .logo-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 20px 0;
+            border-bottom: 2px solid #667eea;
+            margin-bottom: 20px;
+        }
+        
+        .stMetric {
+            background: #2a2a3e;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        
+        div[data-testid="metric-container"] {
+            background: #2a2a3e;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        </style>
+        """
+    else:
+        return """
+        <style>
+        /* Light mode styles */
+        @media (max-width: 768px) {
+            .block-container {
+                padding: 1rem 0.5rem !important;
+            }
+            
+            .stButton>button {
+                font-size: 0.9rem !important;
+                height: 2.5em !important;
+                padding: 0.25rem 0.5rem !important;
+            }
+            
+            .exception-card {
+                font-size: 0.85rem !important;
+                padding: 10px !important;
+            }
+            
+            h1 { font-size: 1.5rem !important; }
+            h2 { font-size: 1.2rem !important; }
+            h3 { font-size: 1rem !important; }
+            
+            .stMetric { padding: 0.5rem !important; }
+            
+            [data-testid="column"] {
+                width: 100% !important;
+                flex: 100% !important;
+            }
+        }
+        
+        /* Light mode specific */
+        .main > div {padding-top: 2rem;}
+        .stButton>button {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            height: 3em;
+            border-radius: 10px;
+            border: none;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.2);
+        }
+        .stButton>button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        .exception-card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            border-left: 4px solid;
+            word-wrap: break-word;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .high-risk {border-left-color: #ff4757;}
+        .medium-risk {border-left-color: #ffa502;}
+        .low-risk {border-left-color: #32ff7e;}
+        
+        .logo-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 20px 0;
+            border-bottom: 2px solid #667eea;
+            margin-bottom: 20px;
+        }
+        
+        .professional-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        div[data-testid="metric-container"] {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        </style>
+        """
+
+# Apply CSS styles
+st.markdown(get_css_styles(), unsafe_allow_html=True)
 
 # Load and prepare data with more exception types
 @st.cache_data
 def load_data():
     """Load the transaction data - in production this would connect to database/ERP"""
-    # For demo, we'll generate sample data
     np.random.seed(42)
     
     # Generate normal transactions
@@ -142,7 +270,7 @@ def load_data():
     approvers = ['jsmith', 'mjones', 'rbrown', 'lwilson', 'kdavis']
     base_date = datetime.now() - timedelta(days=30)
     
-    for i in range(40):  # Reduced to make room for more exceptions
+    for i in range(40):
         trans = {
             'transaction_id': f'INV-{2900 + i}',
             'vendor_name': np.random.choice(vendors),
@@ -277,7 +405,7 @@ def load_data():
 def calculate_metrics(df):
     """Calculate key metrics for dashboard"""
     total_transactions = len(df)
-    exceptions = df[df['risk_score'] > 70]
+    exceptions = df[df['risk_score'] > st.session_state.risk_threshold]
     reviewed = df[df['status'] == 'Processed']
     
     # Calculate potential savings (demo calculation)
@@ -288,111 +416,88 @@ def calculate_metrics(df):
         'exceptions': len(exceptions),
         'reviewed': len(reviewed),
         'savings': potential_savings,
-        'effectiveness': 94  # Demo metric
+        'effectiveness': 94
     }
 
 def is_mobile():
-    """Check if user is on mobile device - simplified approach"""
-    # This is a simplified check. In production, you might use more sophisticated detection
+    """Check if user is on mobile device"""
     return st.session_state.get('mobile_view', False)
 
 def show_dashboard():
     """Main dashboard view with mobile responsiveness"""
-    st.title("🎯 Control Pulse")
-    st.markdown("##### Financial Control Monitoring System")
+    # Professional header with logo
+    logo_svg = create_logo_svg()
+    st.markdown(f"""
+    <div class="logo-header">
+        {logo_svg}
+        <div>
+            <h1 style="margin: 0; font-size: 2rem; font-weight: 700;">Control Pulse</h1>
+            <p style="margin: 0; opacity: 0.8;">Financial Controls in Real-Time</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # User greeting - simplified for mobile
+    # User greeting
     if not is_mobile():
-        col1, col2 = st.columns([2, 1])
+        col1, col2, col3 = st.columns([2, 1, 1])
     else:
         col1 = st.container()
         col2 = None
+        col3 = None
+    
     with col1:
         st.markdown("### Good morning, Rachel!")
         st.markdown("You have **10 exceptions** requiring review")
+    
     if not is_mobile() and col2 is not None:
         with col2:
-            if st.button("👤 Settings"):
-                st.info("Settings page (coming soon)")
+            if st.button("🔔 Notifications"):
+                st.info(f"{'🔔 Enabled' if st.session_state.notifications_enabled else '🔕 Disabled'}")
+    
+    if not is_mobile() and col3 is not None:
+        with col3:
+            if st.button("⚙️ Settings"):
+                st.session_state.current_page = 'settings'
+                st.rerun()
     
     # Load data and calculate metrics
     df = load_data()
     metrics = calculate_metrics(df)
-    exceptions = df[df['risk_score'] > 70].sort_values('risk_score', ascending=False)
+    exceptions = df[df['risk_score'] > st.session_state.risk_threshold].sort_values('risk_score', ascending=False)
     
-    # Display key metrics - responsive grid
+    # Display key metrics
     st.markdown("---")
     
-    # For mobile, show metrics in 2x2 grid instead of 1x4
     if is_mobile():
         col1, col2 = st.columns(2)
         with col1:
-            st.metric(
-                label="🔴 Exceptions",
-                value=metrics['exceptions'],
-                delta="High Priority",
-                delta_color="inverse"
-            )
+            st.metric("🔴 Exceptions", metrics['exceptions'], "High Priority", delta_color="inverse")
         with col2:
-            st.metric(
-                label="✅ Reviewed",
-                value=metrics['reviewed'],
-                delta="+12"
-            )
+            st.metric("✅ Reviewed", metrics['reviewed'], "+12")
         
         col3, col4 = st.columns(2)
         with col3:
-            st.metric(
-                label="💰 Saved",
-                value=f"${metrics['savings']/1000:.0f}K",
-                delta="+23%"
-            )
+            st.metric("💰 Saved", f"${metrics['savings']/1000:.0f}K", "+23%")
         with col4:
-            st.metric(
-                label="📊 Effectiveness",
-                value=f"{metrics['effectiveness']}%",
-                delta="+2%"
-            )
+            st.metric("📊 Effectiveness", f"{metrics['effectiveness']}%", "+2%")
     else:
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.metric(
-                label="🔴 Exceptions",
-                value=metrics['exceptions'],
-                delta="High Priority",
-                delta_color="inverse"
-            )
-        
+            st.metric("🔴 Exceptions", metrics['exceptions'], "High Priority", delta_color="inverse")
         with col2:
-            st.metric(
-                label="✅ Reviewed",
-                value=metrics['reviewed'],
-                delta="+12"
-            )
-        
+            st.metric("✅ Reviewed", metrics['reviewed'], "+12")
         with col3:
-            st.metric(
-                label="💰 Saved",
-                value=f"${metrics['savings']/1000:.0f}K",
-                delta="+23%"
-            )
-        
+            st.metric("💰 Saved", f"${metrics['savings']/1000:.0f}K", "+23%")
         with col4:
-            st.metric(
-                label="📊 Effectiveness",
-                value=f"{metrics['effectiveness']}%",
-                delta="+2%"
-            )
+            st.metric("📊 Effectiveness", f"{metrics['effectiveness']}%", "+2%")
     
     # Exception type filter
     st.markdown("---")
     st.markdown("### 🎯 Exceptions Requiring Review")
     
-    # Add filter for exception types
     exception_types = ['All'] + list(exceptions['anomaly_type'].unique())
     selected_type = st.selectbox("Filter by Exception Type:", exception_types, index=0)
     
-    # Filter exceptions based on selection
     if selected_type != 'All':
         filtered_exceptions = exceptions[exceptions['anomaly_type'] == selected_type]
     else:
@@ -400,12 +505,11 @@ def show_dashboard():
     
     st.markdown(f"*Showing {len(filtered_exceptions)} exception(s)*")
     
-    # Display exceptions - mobile-friendly cards
+    # Display exceptions
     for idx, row in filtered_exceptions.iterrows():
         risk_class = 'high-risk' if row['risk_score'] > 85 else 'medium-risk' if row['risk_score'] > 75 else 'low-risk'
         risk_icon = '🔴' if row['risk_score'] > 85 else '🟡' if row['risk_score'] > 75 else '🟠'
         
-        # Single column layout on mobile
         if is_mobile():
             st.markdown(f"""
             <div class="exception-card {risk_class}">
@@ -439,11 +543,10 @@ def show_dashboard():
                     st.session_state.current_page = 'review'
                     st.rerun()
     
-    # Quick stats visualization - stack on mobile
+    # Quick stats visualization
     st.markdown("---")
     
     if is_mobile():
-        # Stack charts vertically on mobile
         st.markdown("### 📈 Weekly Trend")
         dates = pd.date_range(end=datetime.now(), periods=7)
         trend_data = pd.DataFrame({
@@ -454,8 +557,9 @@ def show_dashboard():
         
         fig = px.line(trend_data, x='Date', y=['Exceptions', 'Reviewed'],
                      title="Exception Detection Trend",
-                     color_discrete_map={'Exceptions': '#ff4444', 'Reviewed': '#00c851'})
-        fig.update_layout(height=250, showlegend=True, margin=dict(l=0, r=0, t=30, b=0))
+                     color_discrete_map={'Exceptions': '#ff4757', 'Reviewed': '#32ff7e'})
+        fig.update_layout(height=250, showlegend=True, margin=dict(l=0, r=0, t=30, b=0),
+                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig, use_container_width=True)
         
         st.markdown("### 🎯 Risk Distribution")
@@ -465,9 +569,10 @@ def show_dashboard():
         })
         
         fig = px.pie(risk_dist, values='Count', names='Risk Level',
-                    color_discrete_map={'High': '#ff4444', 'Medium': '#ffaa00', 'Low': '#00c851'},
+                    color_discrete_map={'High': '#ff4757', 'Medium': '#ffa502', 'Low': '#32ff7e'},
                     title="Current Risk Distribution")
-        fig.update_layout(height=250, margin=dict(l=0, r=0, t=30, b=0))
+        fig.update_layout(height=250, margin=dict(l=0, r=0, t=30, b=0),
+                         paper_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig, use_container_width=True)
     else:
         col1, col2 = st.columns(2)
@@ -483,8 +588,9 @@ def show_dashboard():
             
             fig = px.line(trend_data, x='Date', y=['Exceptions', 'Reviewed'],
                          title="Exception Detection Trend",
-                         color_discrete_map={'Exceptions': '#ff4444', 'Reviewed': '#00c851'})
-            fig.update_layout(height=300, showlegend=True)
+                         color_discrete_map={'Exceptions': '#ff4757', 'Reviewed': '#32ff7e'})
+            fig.update_layout(height=300, showlegend=True,
+                             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
             st.plotly_chart(fig, use_container_width=True)
         
         with col2:
@@ -495,250 +601,24 @@ def show_dashboard():
             })
             
             fig = px.pie(risk_dist, values='Count', names='Risk Level',
-                        color_discrete_map={'High': '#ff4444', 'Medium': '#ffaa00', 'Low': '#00c851'},
+                        color_discrete_map={'High': '#ff4757', 'Medium': '#ffa502', 'Low': '#32ff7e'},
                         title="Current Risk Distribution")
-            fig.update_layout(height=300)
+            fig.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)')
             st.plotly_chart(fig, use_container_width=True)
 
-def show_review_screen():
-    """Detailed review screen for exceptions - mobile optimized"""
-    df = load_data()
-    exceptions = df[df['risk_score'] > 70].sort_values('risk_score', ascending=False)
-    
-    if st.session_state.current_exception >= len(exceptions):
-        st.session_state.current_exception = 0
-    
-    current = exceptions.iloc[st.session_state.current_exception]
-    
-    # Simplified header for mobile
-    if is_mobile():
-        if st.button("← Back"):
-            st.session_state.current_page = 'dashboard'
-            st.rerun()
-        st.markdown(f"### Exception {st.session_state.current_exception + 1}/{len(exceptions)}")
-        if st.button("Next →"):
-            st.session_state.current_exception = (st.session_state.current_exception + 1) % len(exceptions)
-            st.rerun()
-    else:
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col1:
-            if st.button("← Back to Dashboard"):
-                st.session_state.current_page = 'dashboard'
-                st.rerun()
-        
-        with col2:
-            st.markdown(f"### Exception {st.session_state.current_exception + 1} of {len(exceptions)}")
-        
-        with col3:
-            if st.button("Next →"):
-                st.session_state.current_exception = (st.session_state.current_exception + 1) % len(exceptions)
-                st.rerun()
-    
-    st.markdown("---")
-    
-    # Exception details
-    risk_icon = '🔴' if current['risk_score'] > 85 else '🟡' if current['risk_score'] > 75 else '🟠'
-    st.markdown(f"# {risk_icon} {current['anomaly_type']}")
-    
-    # Stack on mobile, side-by-side on desktop
-    if is_mobile():
-        # Mobile: Stack everything vertically
-        st.markdown("### 📋 Transaction Details")
-        st.info(f"""
-        **ID:** {current['transaction_id']}
-        **Vendor:** {current['vendor_name']}
-        **Amount:** ${current['amount']:,.2f}
-        **Approver:** {current['approver']}
-        **Date:** {current['approval_date'].strftime('%Y-%m-%d')}
-        """)
-        
-        st.markdown("### 🤖 AI Analysis")
-        st.success(f"""
-        **Risk Score:** {current['risk_score']:.0f}%
-        
-        **Why Flagged:**
-        {current.get('ai_explanation', 'Pattern anomaly detected')}
-        
-        **Recommended:**
-        {'Reject and investigate' if current['risk_score'] > 85 else 'Request additional documentation'}
-        """)
-        
-        # Exception-specific warnings
-        st.markdown("### ⚠️ Pattern Analysis")
-        if current['anomaly_type'] == 'Duplicate Invoice':
-            st.warning("This vendor typically invoices once per month. This is the 2nd invoice this week.")
-        elif current['anomaly_type'] == 'Unusual Vendor Pattern':
-            st.warning("New vendor with no history. First transaction is 5x higher than average.")
-        elif current['anomaly_type'] == 'Split Invoice Pattern':
-            st.warning("Multiple invoices just below approval threshold detected.")
-        elif current['anomaly_type'] == 'Round Amount Anomaly':
-            st.warning("Suspiciously round amount without detailed breakdown.")
-        elif current['anomaly_type'] == 'Weekend Processing':
-            st.warning("Transaction processed during unusual hours/weekend.")
-        elif current['anomaly_type'] == 'Vendor Detail Change':
-            st.warning("Recent change to vendor banking details detected.")
-        elif current['anomaly_type'] == 'Geographic Anomaly':
-            st.warning("Vendor location or jurisdiction has changed.")
-        else:
-            st.warning("Unusual pattern detected requiring review.")
-    else:
-        # Desktop: Two-column layout
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("### 📋 Transaction Details")
-            st.info(f"""
-            **Transaction ID:** {current['transaction_id']}
-            **Vendor:** {current['vendor_name']}
-            **Amount:** ${current['amount']:,.2f}
-            **Approver:** {current['approver']}
-            **Date:** {current['approval_date'].strftime('%Y-%m-%d %H:%M')}
-            """)
-            
-            # Historical pattern
-            st.markdown("### 📊 Historical Pattern")
-            if current['anomaly_type'] == 'Duplicate Invoice':
-                st.warning("⚠️ This vendor typically invoices once per month. This is the 2nd invoice this week.")
-            elif current['anomaly_type'] == 'Unusual Vendor Pattern':
-                st.warning("⚠️ New vendor with no history. First transaction is 5x higher than average new vendor.")
-            elif current['anomaly_type'] == 'Split Invoice Pattern':
-                st.warning("⚠️ Multiple invoices just below approval threshold detected.")
-            elif current['anomaly_type'] == 'Round Amount Anomaly':
-                st.warning("⚠️ Suspiciously round amount without detailed breakdown.")
-            elif current['anomaly_type'] == 'Weekend Processing':
-                st.warning("⚠️ Transaction processed during unusual hours/weekend.")
-            elif current['anomaly_type'] == 'Vendor Detail Change':
-                st.warning("⚠️ Recent change to vendor banking details detected.")
-            elif current['anomaly_type'] == 'Geographic Anomaly':
-                st.warning("⚠️ Vendor location or jurisdiction has changed to high-risk area.")
-            else:
-                st.warning("⚠️ Unusual pattern detected in transaction history.")
-        
-        with col2:
-            st.markdown("### 🤖 AI Analysis")
-            st.success(f"""
-            **Confidence Score:** {current['risk_score']:.0f}%
-            
-            **Why Flagged:**
-            {current.get('ai_explanation', 'Pattern anomaly detected')}
-            
-            **Recommended Action:**
-            {'Reject and investigate' if current['risk_score'] > 85 else 'Request additional documentation'}
-            """)
-            
-            # Show comparison for duplicates
-            if current['anomaly_type'] == 'Duplicate Invoice':
-                st.markdown("### 🔍 Comparison View")
-                comparison_data = pd.DataFrame({
-                    'Field': ['Invoice ID', 'Vendor', 'Amount', 'Date'],
-                    'Current': ['INV-2947', 'Acme Corp', '$15,420', 'Sept 18'],
-                    'Original': ['INV-2946', 'Acme Corp', '$15,420', 'Sept 17']
-                })
-                st.dataframe(comparison_data, use_container_width=True)
-    
-    # Action buttons - responsive layout
-    st.markdown("---")
-    st.markdown("### Take Action")
-    
-    if is_mobile():
-        # Stack buttons on mobile
-        if st.button("✅ APPROVE", type="primary", use_container_width=True):
-            show_action_confirmation('approve', current)
-        if st.button("❌ REJECT", type="primary", use_container_width=True):
-            show_action_confirmation('reject', current)
-        if st.button("📧 REQUEST INFO", type="primary", use_container_width=True):
-            show_action_confirmation('request', current)
-    else:
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button("✅ APPROVE", type="primary", use_container_width=True):
-                show_action_confirmation('approve', current)
-        
-        with col2:
-            if st.button("❌ REJECT", type="primary", use_container_width=True):
-                show_action_confirmation('reject', current)
-        
-        with col3:
-            if st.button("📧 REQUEST INFO", type="primary", use_container_width=True):
-                show_action_confirmation('request', current)
-
-def show_action_confirmation(action, transaction):
-    """Show confirmation dialog for actions - mobile optimized"""
-    st.markdown("---")
-    st.markdown("### ⚡ Action Confirmation")
-    
-    action_text = {
-        'approve': 'APPROVING',
-        'reject': 'REJECTING',
-        'request': 'REQUESTING INFO for'
-    }
-    
-    st.info(f"You are {action_text[action]} Transaction {transaction['transaction_id']}")
-    
-    # Pre-filled reason
-    reason = st.text_area(
-        "Reason (AI Pre-filled):",
-        value=f"{transaction['anomaly_type']} - {transaction.get('ai_explanation', '')}",
-        height=100
-    )
-    
-    # Additional notes
-    notes = st.text_area("Additional Notes (Optional):", height=100)
-    
-    # Evidence capture notice
-    st.success(f"""
-    ✅ Evidence Automatically Captured:
-    - Screenshot of analysis
-    - Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-    - Reviewer: Rachel Chen
-    - AI Confidence Score: {transaction['risk_score']:.0f}%
-    """)
-    
-    # Mobile-responsive button layout
-    if is_mobile():
-        if st.button("✅ CONFIRM", type="primary", use_container_width=True):
-            handle_action_confirmation(action, transaction, reason, notes)
-        if st.button("❌ CANCEL", use_container_width=True):
-            st.rerun()
-    else:
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if st.button("✅ CONFIRM", type="primary", use_container_width=True):
-                handle_action_confirmation(action, transaction, reason, notes)
-        
-        with col2:
-            if st.button("❌ CANCEL", use_container_width=True):
-                st.rerun()
-
-def handle_action_confirmation(action, transaction, reason, notes):
-    """Handle the confirmation of an action"""
-    # Record the action
-    action_record = {
-        'timestamp': datetime.now(),
-        'transaction_id': transaction['transaction_id'],
-        'action': action,
-        'reason': reason,
-        'notes': notes,
-        'reviewer': 'Rachel Chen',
-        'ai_score': transaction['risk_score']
-    }
-    
-    st.session_state.actions_taken.append(action_record)
-    st.session_state.reviewed_items.append(transaction['transaction_id'])
-    
-    st.success(f"✅ Transaction {action}ed successfully!")
-    st.balloons()
-    
-    # Return to dashboard after 2 seconds
-    time.sleep(2)
-    st.session_state.current_page = 'dashboard'
-    st.rerun()
-
-def show_evidence_repository():
-    """Show audit trail and evidence repository - mobile optimized"""
-    st.title("📁 Evidence Repository")
+def show_settings():
+    """Settings page for user preferences"""
+    # Header
+    logo_svg = create_logo_svg()
+    st.markdown(f"""
+    <div class="logo-header">
+        {logo_svg}
+        <div>
+            <h1 style="margin: 0; font-size: 2rem; font-weight: 700;">Settings</h1>
+            <p style="margin: 0; opacity: 0.8;">Configure your Control Pulse preferences</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
     if st.button("← Back to Dashboard"):
         st.session_state.current_page = 'dashboard'
@@ -746,101 +626,81 @@ def show_evidence_repository():
     
     st.markdown("---")
     
-    # Filter options - stack on mobile
-    if is_mobile():
-        date_filter = st.selectbox("Time Period", ["Last 30 days", "Last 7 days", "Today"])
-        user_filter = st.selectbox("Reviewer", ["All", "Rachel Chen", "John Smith"])
-        action_filter = st.selectbox("Action Type", ["All", "Approved", "Rejected", "Info Requested"])
-    else:
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            date_filter = st.selectbox("Time Period", ["Last 30 days", "Last 7 days", "Today"])
-        with col2:
-            user_filter = st.selectbox("Reviewer", ["All", "Rachel Chen", "John Smith"])
-        with col3:
-            action_filter = st.selectbox("Action Type", ["All", "Approved", "Rejected", "Info Requested"])
+    # Settings sections
+    col1, col2 = st.columns(2) if not is_mobile() else [st.container(), st.container()]
     
-    # Display actions taken
-    if st.session_state.actions_taken:
-        st.markdown("### Recent Actions")
-        for action in reversed(st.session_state.actions_taken):
-            action_icon = {'approve': '✅', 'reject': '❌', 'request': '📧'}.get(action['action'], '❓')
-            
-            st.markdown(f"""
-            <div class="exception-card low-risk">
-                <strong>{action_icon} {action['timestamp'].strftime('%Y-%m-%d %H:%M')} | {action['action'].upper()}</strong><br>
-                Transaction: {action['transaction_id']}<br>
-                Reason: {action['reason']}<br>
-                AI Score: {action['ai_score']:.0f}%<br>
-                Evidence: Screenshot, Notes, Audit Log
-            </div>
-            """, unsafe_allow_html=True)
-            
-            if not is_mobile():
-                col1, col2 = st.columns([1, 5])
-                with col1:
-                    st.button("📥 Download", key=f"dl_{action['transaction_id']}_{action['timestamp']}")
-            else:
-                st.button("📥 Download Evidence", key=f"dl_{action['transaction_id']}_{action['timestamp']}", use_container_width=True)
-    else:
-        st.info("No actions recorded yet. Review some exceptions to see the audit trail.")
+    with col1:
+        st.markdown("### 🎨 Appearance")
+        dark_mode = st.checkbox("🌙 Dark Mode", value=st.session_state.dark_mode)
+        if dark_mode != st.session_state.dark_mode:
+            st.session_state.dark_mode = dark_mode
+            st.rerun()
+        
+        mobile_view = st.checkbox("📱 Mobile View", value=st.session_state.get('mobile_view', False))
+        if mobile_view != st.session_state.get('mobile_view', False):
+            st.session_state.mobile_view = mobile_view
+            st.rerun()
+        
+        st.markdown("### 🔔 Notifications")
+        st.session_state.notifications_enabled = st.checkbox(
+            "Enable Desktop Notifications",
+            value=st.session_state.notifications_enabled
+        )
+        
+        st.session_state.email_alerts = st.checkbox(
+            "Enable Email Alerts",
+            value=st.session_state.email_alerts
+        )
+        
+        if st.session_state.email_alerts:
+            email = st.text_input("Email Address", value="rachel.chen@company.com")
+            alert_frequency = st.selectbox(
+                "Alert Frequency",
+                ["Immediate", "Hourly", "Daily Summary", "Weekly Report"]
+            )
     
-    # Export options - mobile responsive
+    with col2:
+        st.markdown("### ⚙️ Detection Settings")
+        
+        st.session_state.risk_threshold = st.slider(
+            "Risk Score Threshold",
+            min_value=50,
+            max_value=95,
+            value=st.session_state.risk_threshold,
+            step=5,
+            help="Transactions with risk scores above this threshold will be flagged"
+        )
+        
+        st.session_state.auto_refresh = st.checkbox(
+            "Auto-refresh Dashboard",
+            value=st.session_state.auto_refresh
+        )
+        
+        if st.session_state.auto_refresh:
+            refresh_interval = st.selectbox(
+                "Refresh Interval",
+                ["30 seconds", "1 minute", "5 minutes", "15 minutes"]
+            )
+        
+        st.markdown("### 📊 Report Preferences")
+        report_format = st.selectbox(
+            "Default Export Format",
+            ["PDF", "Excel", "CSV", "JSON"]
+        )
+        
+        include_evidence = st.checkbox("Include Evidence in Reports", value=True)
+        include_ai_reasoning = st.checkbox("Include AI Reasoning", value=True)
+    
     st.markdown("---")
+    st.markdown("### 👤 User Profile")
     
-    if is_mobile():
-        if st.button("📊 Export Audit Report", type="primary", use_container_width=True):
-            st.success("Audit report exported successfully!")
-        if st.button("📦 Download All Evidence", type="primary", use_container_width=True):
-            st.success("Evidence package created successfully!")
-    else:
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if st.button("📊 Export Audit Report", type="primary", use_container_width=True):
-                st.success("Audit report exported successfully!")
-        
-        with col2:
-            if st.button("📦 Download All Evidence", type="primary", use_container_width=True):
-                st.success("Evidence package created successfully!")
-
-# Main app navigation
-def main():
-    # Check if mobile view toggle exists
-    mobile_toggle = st.checkbox("📱 Mobile View", value=False, key="mobile_view")
+    col1, col2 = st.columns(2) if not is_mobile() else [st.container(), st.container()]
     
-    # Sidebar for navigation (hidden by default, can be toggled)
-    with st.sidebar:
-        st.markdown("## Navigation")
-        if st.button("🏠 Dashboard"):
-            st.session_state.current_page = 'dashboard'
-        if st.button("📁 Evidence Repository"):
-            st.session_state.current_page = 'evidence'
-        
-        st.markdown("---")
-        st.markdown("### Quick Stats")
-        st.metric("Reviews Today", len(st.session_state.reviewed_items))
-        st.metric("Actions Taken", len(st.session_state.actions_taken))
-        
-        st.markdown("---")
-        st.markdown("### Exception Types")
-        st.markdown("""
-        - 🔴 **High Risk** (85%+)
-        - 🟡 **Medium Risk** (75-84%)
-        - 🟠 **Low-Medium** (70-74%)
-        """)
-        
-        st.markdown("---")
-        st.markdown("### Demo Mode")
-        st.info("This is a prototype for customer validation. In production, this would connect to your ERP system.")
+    with col1:
+        st.text_input("Name", value="Rachel Chen")
+        st.text_input("Title", value="Senior Financial Controller")
+        st.text_input("Department", value="Finance")
     
-    # Main content area
-    if st.session_state.current_page == 'dashboard':
-        show_dashboard()
-    elif st.session_state.current_page == 'review':
-        show_review_screen()
-    elif st.session_state.current_page == 'evidence':
-        show_evidence_repository()
-
-if __name__ == "__main__":
-    main()
+    with col2:
+        st.text_input("Employee ID", value="EMP-2847")
+        st.selectbox("Approval Authority", ["$10,000", "$50,000",
