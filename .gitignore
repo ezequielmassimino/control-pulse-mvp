@@ -1,0 +1,12 @@
+venv/
+   *.pyc
+   __pycache__/
+   .DS_Store
+   *.csv
+   *.xlsx
+   *.db
+   config.yaml
+   .env
+   logs/
+   exports/
+   data/
